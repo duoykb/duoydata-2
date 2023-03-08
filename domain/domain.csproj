@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\interfaces\interfaces.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Spectre.Console" Version="0.46.1-preview.0.13" />
+    </ItemGroup>
+
+</Project>
