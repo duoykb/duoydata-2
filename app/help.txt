@@ -1,0 +1,45 @@
+﻿
+
+table
+    
+    "A" "B" "C" "D"
+     1   2   3   4
+     5   6   7   8
+     
+commands:
+
+    to select rows
+    
+    r[0:1]   => "A" "B" "C" "D"
+    
+    r[0:2]   => "A" "B" "C" "D"
+                 1   2   3   4
+    
+    r[2:0]   =>  5   6   7   8
+                 1   2   3   4
+                 
+                 use "e" prefix to mean from the end
+    
+    r[e0:0]  =>  5   6   7   8
+                 1   2   3   4
+    
+    r[e1:e0] =>  1   2   3   4
+                 5   6   7   8
+                 
+    to select columns
+     
+     c[0:2] =>  "A" "B" 
+                 1   2  
+                 5   6  
+     
+     c[e0:e2] =>  "D" "C"
+                   4   3
+                   8   7
+                   
+     
+     similarly use both 
+        r[n:n] c[n:n]
+        
+        to select , reorder the table 
+        the "e" prefix works too...
+            
