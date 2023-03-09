@@ -9,233 +9,168 @@ public class DtableCommands
 
     private Dictionary<string, (Regex, Action<string>)> Patterns => new()
     {
-        [nameof(TableHead)] = (new Regex(@"^\s*table\s+head\s*$", RegexOptions.IgnoreCase), TableHead),
-        [nameof(TableHeadWithCount)] = (
-            new Regex(@"^\s*table\s+head\s+maxrows\s+(?<n>[0-9]+)\s*$", RegexOptions.IgnoreCase), TableHeadWithCount),
-        [nameof(TableTail)] = (new Regex(@"^\s*table\s+tail\s*$", RegexOptions.IgnoreCase), TableTail),
-        [nameof(TableTailWithCount)] = (
-            new Regex(@"^\s*table\s+tail\s+maxrows\s+(?<n>[0-9]+)\s*$", RegexOptions.IgnoreCase), TableTailWithCount),
-        [nameof(TableInfo)] = (new Regex(@"^\s*table\s+info\s*$", RegexOptions.IgnoreCase), TableInfo),
-        [nameof(TableRowHead)] = (new Regex(@"^\s*table\s+rowat\s+(?<n>[0-9]+)\s+head\s*$", RegexOptions.IgnoreCase),
-            TableRowHead),
-        [nameof(TableRowHeadWithCount)] = (
-            new Regex(@"^\s*table\s+rowat\s+(?<n>[0-9]+)\s+head\s+maxentries\s+(?<c>[0-9])\s*$",
-                RegexOptions.IgnoreCase), TableRowHeadWithCount),
-        [nameof(TableRowTail)] = (new Regex(@"^\s*table\s+rowat\s+(?<n>[0-9]+)\s+tail\s*$", RegexOptions.IgnoreCase),
-            TableRowTail),
-        [nameof(TableRowTailWithCount)] = (
-            new Regex(@"^\s*table\s+rowat\s+(?<n>[0-9]+)\s+tail\s+maxentries\s+(?<c>[0-9])\s*$",
-                RegexOptions.IgnoreCase), TableRowTailWithCount),
-        [nameof(TableColumnHead)] = (
-            new Regex(@"^\s*table\s+columnat\s+(?<n>[0-9]+)\s+head\s*$", RegexOptions.IgnoreCase), TableColumnHead),
-        [nameof(TableColumnHeadWithCount)] = (
-            new Regex(@"^\s*table\s+columnat\s+(?<n>[0-9]+)\s+head\s+maxentries\s+(?<c>[0-9])\s*$",
-                RegexOptions.IgnoreCase), TableColumnHeadWithCount),
-        [nameof(TableColumnTail)] = (
-            new Regex(@"^\s*table\s+columnat\s+(?<n>[0-9]+)\s+tail\s*$", RegexOptions.IgnoreCase), TableColumnTail),
-        [nameof(TableColumnTailWithCount)] = (
-            new Regex(@"^\s*table\s+columnat\s+(?<n>[0-9]+)\s+tail\s+maxentries\s+(?<c>[0-9])\s*$",
-                RegexOptions.IgnoreCase), TableColumnTailWithCount),
+        [nameof(IndexRow)] = (
+            new Regex(@"^r\[\s*(?<start>e?[0-9]+)\s*:\s*(?<range>e?[0-9]+)\s*\]$"), IndexRow),
+        [nameof(IndexColumn)] = (
+            new Regex(@"^c\[\s*(?<start>e?[0-9]+)\s*:\s*(?<range>e?[0-9]+)\s*\]$"), IndexColumn),
+        [nameof(IndexRowAndColumn)] =
+            (new Regex(@"^(
+                           r\[\s*(?<startR>e?[0-9]+)\s*:\s*(?<rangeR>e?[0-9]+)\s*\]\s+c\[\s*(?<startC>e?[0-9]+)\s*:\s*(?<rangeC>e?[0-9]+)\s*\]
+                            |
+                           c\[\s*(?<startC>e?[0-9]+)\s*:\s*(?<rangeC>e?[0-9]+)\s*\]\s+r\[\s*(?<startR>e?[0-9]+)\s*:\s*(?<rangeR>e?[0-9]+)\s*\]
+                          )$", RegexOptions.IgnorePatternWhitespace), IndexRowAndColumn)
     };
 
-    private void TableHead(string cmd)
+    private void IndexRow(string cmd)
     {
+        var match = Patterns[nameof(IndexRow)].Item1.Match(cmd);
+        var start = match.Groups["start"].Value;
+        var range = match.Groups["range"].Value;
+
+        var lastRowIndex = Dtable.GetInfo().NumberOfRows - 1;
+        var sIndex = start.StartsWith("e") ? lastRowIndex - int.Parse(start.Replace("e", "")) : int.Parse(start);
+        var eIndex = range.StartsWith("e") ? lastRowIndex - int.Parse(range.Replace("e", "")) : int.Parse(range);
+        var increment = sIndex < eIndex ? 1 : -1;
+        var condition = bool(int sI, int eI) => increment < 0 ? sI > eI : eI > sI;
+
         var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
-        var rowNumber = 0;
-        foreach (var o in Dtable.GetRow(rowNumber).Head()) specTable.AddColumn($"{o}");
-
-        var info = Dtable.GetInfo();
-
-        while (rowNumber < info.NumberOfRows)
+        // [0:0] unless there is a check it will add the first row as columns 
+        if (condition(sIndex, eIndex))
         {
-            specTable.AddRow(Dtable.GetRow(rowNumber).Head().Select(o => o.ToString()?? "").ToArray());
-            rowNumber += 1;
+            foreach (var entry in Dtable.GetRow(sIndex).Head()) specTable.AddColumn($"{entry}");
+            sIndex += increment;
         }
-        
-        AnsiConsole.Write(specTable);
-    }
 
-    private void TableHeadWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableHeadWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
-        var rowNumber = 0;
-        foreach (var o in Dtable.GetRow(rowNumber).Head()) specTable.AddColumn($"{o}");
-
-        var info = Dtable.GetInfo();
-
-        while (rowNumber < info.NumberOfRows && rowNumber < n)
+        while (condition(sIndex, eIndex))
         {
-            specTable.AddRow(Dtable.GetRow(rowNumber).Head().Select(o => o.ToString()?? "").ToArray());
-            rowNumber += 1;
+            specTable.AddRow(Dtable.GetRow(sIndex).Head().Select(entry => $"{entry}").ToArray());
+            sIndex += increment;
         }
-        
+
         AnsiConsole.Write(specTable);
     }
 
-    private void TableTail(string cmd)
+    private void IndexColumn(string cmd)
     {
+        var match = Patterns[nameof(IndexColumn)].Item1.Match(cmd);
+        var start = match.Groups["start"].Value;
+        var range = match.Groups["range"].Value;
+
+        var lastColumnIndex = Dtable.GetInfo().NumberOfColumns - 1;
+        var sIndex = start.StartsWith("e") ? lastColumnIndex - int.Parse(start.Replace("e", "")) : int.Parse(start);
+        var eIndex = range.StartsWith("e") ? lastColumnIndex - int.Parse(range.Replace("e", "")) : int.Parse(range);
+        var increment = sIndex < eIndex ? 1 : -1;
+        var condition = bool(int sI, int eI) => increment < 0 ? sI > eI : eI > sI;
+
         var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
-        var info = Dtable.GetInfo();
-        
-        var lastRow = info.NumberOfRows - 1;
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Head()) specTable.AddColumn($"{o}");
-        
-        // B\se the first row is the Column header
-        while (lastRow >= 1)
+        var maxNumberOfRows = Dtable.GetInfo().NumberOfRows;
+        var entryIndex = 0;
+
+        var tempStartIndex = sIndex;
+        var tempEndIndex = eIndex;
+
+        // example: c[0:0]   no column is selected in this case return
+        if (condition(sIndex, eIndex) is false)
+            return;
+
+        while (condition(tempStartIndex, tempEndIndex))
         {
-            specTable.AddRow(Dtable.GetRow(lastRow).Head().Select(o => o.ToString()?? "").ToArray());
-            lastRow -= 1;
-        }
-        
-        AnsiConsole.Write(specTable);
-    }
+            var column = Dtable.GetColumn(tempStartIndex);
 
-    private void TableTailWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableTailWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
-        var info = Dtable.GetInfo();
-        
-        var lastRow = info.NumberOfRows - 1;
-        var count = 0;
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Head()) specTable.AddColumn($"{o}");
-        
-        while (lastRow >= 1 && count < n)
+            tempStartIndex += increment;
+
+            // why continue? for inconsistent table
+            if (column.Size <= entryIndex)
+                continue;
+            specTable.AddColumn($"{column[entryIndex]}");
+        }
+
+        entryIndex += 1;
+        while (maxNumberOfRows > entryIndex)
         {
-            specTable.AddRow(Dtable.GetRow(lastRow).Head().Select(o => o.ToString()?? "").ToArray());
-            lastRow -= 1;
-            count += 1;
+            tempStartIndex = sIndex;
+            tempEndIndex = eIndex;
+            var entries = new LinkedList<string>();
+            while (condition(tempStartIndex, tempEndIndex))
+            {
+                var column = Dtable.GetColumn(tempStartIndex);
+                tempStartIndex += increment;
+                if (column.Size <= entryIndex)
+                    continue;
+                entries.AddLast($"{column[entryIndex]}");
+            }
+
+            specTable.AddRow(entries.ToArray());
+            entryIndex += 1;
         }
-        
+
         AnsiConsole.Write(specTable);
     }
 
-    //TODO implement TableInfo
-    private void TableInfo(string cmd)
+    private void IndexRowAndColumn(string cmd)
     {
-    }
+        var match = Patterns[nameof(IndexRowAndColumn)].Item1.Match(cmd);
 
-    private void TableRowHead(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableRowHead)].Item1.Match(cmd).Groups["n"].Value);
-        
-        var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
+        var startR = match.Groups["startR"].Value;
+        var rangeR = match.Groups["rangeR"].Value;
+        var startC = match.Groups["startC"].Value;
+        var rangeC = match.Groups["rangeC"].Value;
+
         var info = Dtable.GetInfo();
-        
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Head()) specTable.AddColumn($"{o}");
+        var lastRowIndex = info.NumberOfRows - 1;
+        var lastColumnIndex = info.NumberOfColumns - 1;
 
-        specTable.AddRow(Dtable.GetRow(n).Head().Select(e => $"{e}").ToArray());
-        AnsiConsole.Write(specTable);
-    }
+        var startRowIndex = startR.StartsWith("e")
+            ? lastRowIndex - int.Parse(startR.Replace("e", ""))
+            : int.Parse(startR);
+        var rangeRowIndex = rangeR.StartsWith("e")
+            ? lastRowIndex - int.Parse(rangeR.Replace("e", ""))
+            : int.Parse(rangeR);
+        var incrementR = startRowIndex > rangeRowIndex ? -1 : 1;
 
-    private void TableRowHeadWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableRowHeadWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var ec = int.Parse(Patterns[nameof(TableRowHeadWithCount)].Item1.Match(cmd).Groups["c"].Value);
-        
-        var specTable = new Table();
-        specTable.Border(TableBorder.Rounded);
-        var info = Dtable.GetInfo();
-        
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Head().Take(ec)) specTable.AddColumn($"{o}");
 
-        specTable.AddRow(Dtable.GetRow(n).Head(ec).Select(e => $"{e}").ToArray());
-        AnsiConsole.Write(specTable);
-    }
+        var startColumnIndex = startC.StartsWith("e")
+            ? lastColumnIndex - int.Parse(startC.Replace("e", ""))
+            : int.Parse(startC);
+        var rangeColumnIndex = rangeC.StartsWith("e")
+            ? lastColumnIndex - int.Parse(rangeC.Replace("e", ""))
+            : int.Parse(rangeC);
+        var incrementC = startColumnIndex > rangeColumnIndex ? -1 : 1;
 
-    private void TableRowTail(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableRowTail)].Item1.Match(cmd).Groups["n"].Value);
-
-        var specTable = new Table();
-        var info = Dtable.GetInfo();
-        
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Tail()) specTable.AddColumn($"{o}");
-
-        specTable.AddRow(Dtable.GetRow(n).Tail().Select(e => $"{e}").ToArray());
-        AnsiConsole.Write(specTable);
-    }
-
-    private void TableRowTailWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableRowTailWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var ec = int.Parse(Patterns[nameof(TableRowTailWithCount)].Item1.Match(cmd).Groups["c"].Value);
+        var condition = bool(int start, int range, int increment) => increment switch
+        {
+            -1 => start > range,
+            1 => range > start,
+            _ => throw new ArgumentException("increment must be 1 or -1")
+        };
+        if (!(condition(startRowIndex, rangeRowIndex, incrementR) && condition(startColumnIndex, rangeColumnIndex, incrementC)))
+            return;
         
         var specTable = new Table();
-        var info = Dtable.GetInfo();
-        
-        // Why 0?? the first row has always the max number of columns??
-        foreach (var o in Dtable.GetRow(0).Tail().Take(ec)) specTable.AddColumn($"{o}");
 
-        specTable.AddRow(Dtable.GetRow(n).Tail().Take(ec).Select(e => $"{e}").ToArray());
-        AnsiConsole.Write(specTable);
-    }
-
-    private void TableColumnHead(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableColumnHead)].Item1.Match(cmd).Groups["n"].Value);
-        var specTable = new Table();
-        specTable.AddColumn($"{Dtable.GetColumn(n)[0]}");
-
-        foreach (var e in Dtable.GetColumn(n).Head().Select(e=>$"{e}").Skip(1)) specTable.AddRow(e);
         
-        AnsiConsole.Write(specTable);
-    }
+        foreach (var i in Enumerable.Range(0, Math.Abs(startColumnIndex - rangeColumnIndex)))
+            specTable.AddColumn($"");
+            
+        var tempStartColumnIndex = startColumnIndex;
 
-    private void TableColumnHeadWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableColumnHeadWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var ec = int.Parse(Patterns[nameof(TableColumnHeadWithCount)].Item1.Match(cmd).Groups["c"].Value);
-        
-        var specTable = new Table();
-        specTable.AddColumn($"{Dtable.GetColumn(n)[0]}");
+        while (condition(startRowIndex, rangeRowIndex, incrementR))
+        {
+            var entries = new LinkedList<string>();
 
-        foreach (var e in Dtable.GetColumn(n).Head().Select(e=>$"{e}").Skip(1).Take(ec)) specTable.AddRow(e);
-        
-        AnsiConsole.Write(specTable);
-        
-    }
-
-    private void TableColumnTail(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableColumnTail)].Item1.Match(cmd).Groups["n"].Value);
-        
-        var specTable = new Table();
-        specTable.AddColumn($"{Dtable.GetColumn(n)[0]}");
-
-        foreach (var e in Dtable.GetColumn(n)
-                     .Tail()
-                     .Select(e=>$"{e}")
-                     .Take(Dtable.GetColumn(n).Size - 1)) specTable.AddRow(e);
-        
-        AnsiConsole.Write(specTable);
-    }
-
-    private void TableColumnTailWithCount(string cmd)
-    {
-        var n = int.Parse(Patterns[nameof(TableColumnTailWithCount)].Item1.Match(cmd).Groups["n"].Value);
-        var ec = int.Parse(Patterns[nameof(TableColumnTailWithCount)].Item1.Match(cmd).Groups["c"].Value);
-        
-        
-        var specTable = new Table();
-        specTable.AddColumn($"{Dtable.GetColumn(n)[0]}");
-
-        foreach (var e in Dtable.GetColumn(n)
-                     .Tail()
-                     .Select(e=>$"{e}")
-                     .Take(Dtable.GetColumn(n).Size - 1)
-                     .Take(ec)) specTable.AddRow(e);
+            while (condition(tempStartColumnIndex, rangeColumnIndex, incrementC))
+            {
+                var column = Dtable.GetColumn(tempStartColumnIndex);
+                tempStartColumnIndex += incrementC;
+                
+                if(startRowIndex >= column.Size)
+                    continue;
+                entries.AddLast($"{column[startRowIndex]}");
+            }
+            specTable.AddRow(entries.ToArray());
+            startRowIndex += incrementR;
+            tempStartColumnIndex = startColumnIndex;
+        }
         
         AnsiConsole.Write(specTable);
     }
