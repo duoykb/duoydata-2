@@ -5,6 +5,5 @@ var dtable = DtableBuilder.FromCsv(@"C:\Users\kb\Desktop\WD\myprojects\duoydata\
 var cmd = new DtableCommands{Dtable = dtable};
 
 string? input;
-var txt = new FigletText("duoy Data");
-AnsiConsole.Write(txt);
+AnsiConsole.Write(new FigletText("duoy Data"));
 while ((input = AnsiConsole.Ask<string>(">>> ")).Trim().ToLower() is not null or "exit") cmd.Execute(input);
