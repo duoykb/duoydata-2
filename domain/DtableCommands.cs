@@ -9,6 +9,7 @@ public class DtableCommands
 
     private Dictionary<string, (Regex, Action<string>)> Patterns => new()
     {
+        [nameof(Info)] = (new Regex("info"), Info),
         [nameof(IndexRow)] = (
             new Regex(@"^r\[\s*(?<start>e?[0-9]+)\s*:\s*(?<range>e?[0-9]+)\s*\]$"), IndexRow),
         [nameof(IndexColumn)] = (
@@ -107,6 +108,14 @@ public class DtableCommands
         AnsiConsole.Write(specTable);
     }
 
+    private void Info(string cmd)
+    {
+        var info = Dtable.GetInfo();
+        Console.WriteLine();
+        Console.WriteLine($"Columns: {info.NumberOfColumns}");
+        Console.WriteLine($"Rows: {info.NumberOfRows}");
+        Console.WriteLine();
+    }
     private void IndexRowAndColumn(string cmd)
     {
         var match = Patterns[nameof(IndexRowAndColumn)].Item1.Match(cmd);
