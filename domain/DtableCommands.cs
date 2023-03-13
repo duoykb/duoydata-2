@@ -143,16 +143,31 @@ public class DtableCommands
             1 => range > start,
             _ => throw new ArgumentException("increment must be 1 or -1")
         };
-        if (!(condition(startRowIndex, rangeRowIndex, incrementR) && condition(startColumnIndex, rangeColumnIndex, incrementC)))
+        if (!(condition(startRowIndex, rangeRowIndex, incrementR) &&
+              condition(startColumnIndex, rangeColumnIndex, incrementC)))
             return;
-        
+
         var specTable = new Table();
 
-        
-        foreach (var i in Enumerable.Range(0, Math.Abs(startColumnIndex - rangeColumnIndex)))
-            specTable.AddColumn($"");
-            
+
+        // foreach (var i in Enumerable.Range(0, Math.Abs(startColumnIndex - rangeColumnIndex)))
+        //     specTable.AddColumn($"");
+
         var tempStartColumnIndex = startColumnIndex;
+
+        if (condition(startRowIndex, rangeRowIndex, incrementR))
+        {
+            while (condition(tempStartColumnIndex, rangeColumnIndex, incrementC))
+            {
+                var column = Dtable.GetColumn(tempStartColumnIndex);
+                tempStartColumnIndex += incrementC;
+                specTable.AddColumn($"{column[0]}");
+            }
+
+            if (startRowIndex is 0)
+                startRowIndex += incrementR;
+            tempStartColumnIndex = startColumnIndex;
+        }
 
         while (condition(startRowIndex, rangeRowIndex, incrementR))
         {
@@ -162,16 +177,17 @@ public class DtableCommands
             {
                 var column = Dtable.GetColumn(tempStartColumnIndex);
                 tempStartColumnIndex += incrementC;
-                
-                if(startRowIndex >= column.Size)
+
+                if (startRowIndex >= column.Size)
                     continue;
                 entries.AddLast($"{column[startRowIndex]}");
             }
+
             specTable.AddRow(entries.ToArray());
             startRowIndex += incrementR;
             tempStartColumnIndex = startColumnIndex;
         }
-        
+
         AnsiConsole.Write(specTable);
     }
 
